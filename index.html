@@ -256,7 +256,10 @@
         #high-score-list {
             list-style: none; padding: 0; margin: 15px 0 0 0; 
             font-size: 1rem; color: #fff; text-align: left;
-            width: 100%; max-height: 200px; overflow-y: auto;
+            width: 100%; 
+            /* 랭킹 목록이 길어지면 스크롤이 가능하도록 최대 높이를 설정합니다. */
+            max-height: 400px; 
+            overflow-y: auto;
         }
         
         #high-score-list li {
@@ -344,13 +347,15 @@
         <div id="ranking-btn-toggle" class="display-none">RANKING</div>
 
         <div id="ranking-board">
-            <h2>GLOBAL HALL OF TOP</h2>
+            <h2>Worldwide Ranking</h2>
             <div class="replay-hint">Click initials to watch replay</div>
             <ul id="high-score-list">
                 <li style="justify-content:center; color:#888;">Connecting...</li>
             </ul>
             <button id="close-ranking-board">CLOSE</button>
         </div>
+
+        <div id="initialsModal" class="display-none"></div>
 
         <div id="menu-screen" class="hide">
             <h1>TOP</h1>
@@ -408,6 +413,7 @@
     }
     
     let currentUser = null;
+    const MAX_RANKING_COUNT = 30; // 랭킹 최대 표시 인원 설정
 
     // --- Helper: 실행 환경에 따라 올바른 DB 경로 가져오기 ---
     function getScoresCollection() {
@@ -448,21 +454,23 @@
                 docs.push({ id: doc.id, ...doc.data() });
             });
             docs.sort((a, b) => b.score - a.score);
-            return docs;
+            return docs; // 30개만 보여줄 것이므로, 모두 가져와서 정렬한 뒤에 잘라서 반환
         } catch (e) {
             console.error("Fetch error:", e);
             return [];
         }
     }
 
+    // --- [수정] 30위 초과하는 항목을 삭제하도록 로직 변경 ---
     async function cleanupOldScores(allScores) {
-        if (allScores.length > 10) {
-            const toDelete = allScores.slice(10);
+        if (allScores.length > MAX_RANKING_COUNT) {
+            // 상위 30개는 남기고, 그 이후 항목들을 삭제
+            const toDelete = allScores.slice(MAX_RANKING_COUNT); 
             const deletePromises = toDelete.map(s => 
                 deleteDoc(doc(getScoresCollection(), s.id))
             );
             await Promise.all(deletePromises);
-            return allScores.slice(0, 10);
+            return allScores.slice(0, MAX_RANKING_COUNT);
         }
         return allScores;
     }
@@ -471,23 +479,26 @@
         if (!currentUser || !db) return;
         ui.loading.classList.remove('display-none');
         try {
+            // 리플레이 데이터를 JSON 문자열로 저장하여 Firestore의 크기 제약 및 구조 문제를 회피
             await addDoc(getScoresCollection(), {
                 score: score,
                 initials: initials,
-                replayData: replayData, 
+                replayData: JSON.stringify(replayData), // ReplayData를 JSON 문자열로 직렬화
                 userId: currentUser.uid,
                 timestamp: Date.now()
             });
             await refreshHighScores(); 
         } catch (e) {
             console.error("Save error:", e);
-            alert("Save Failed. (If exported, check Firebase Rules)");
+            // alert 대신 콘솔 로그 사용
+            console.error("Save Failed. (If exported, check Firebase Rules and Replay Data Size)"); 
         } finally {
             ui.loading.classList.add('display-none');
         }
     }
 
     async function refreshHighScores() {
+        // 모든 점수를 가져와서 정렬하고, 30위 초과하는 항목을 정리합니다.
         const allScores = await fetchTopScores();
         highScores = await cleanupOldScores(allScores);
         displayHighScores();
@@ -652,6 +663,7 @@
             ui.scoreList.innerHTML = '<li style="color:#aaa; text-align:center;">No records yet.</li>';
             return;
         }
+        // 랭킹은 cleanupOldScores에서 이미 MAX_RANKING_COUNT개로 정리되어 있으므로, 모두 표시합니다.
         highScores.forEach((score, index) => {
             const li = document.createElement('li');
             li.innerHTML = `
@@ -663,13 +675,25 @@
             `;
             li.querySelector('span:nth-child(2)').onclick = (e) => { 
                 e.stopPropagation(); 
-                if(score.replayData) startReplay(score.replayData); 
+                if(score.replayData) {
+                    try {
+                        // DB에서 가져온 JSON 문자열을 다시 객체로 변환
+                        const replayData = typeof score.replayData === 'string' ? JSON.parse(score.replayData) : score.replayData;
+                        startReplay(replayData); 
+                    } catch (error) {
+                        console.error("Replay data parse error:", error);
+                    }
+                }
             };
             ui.scoreList.appendChild(li);
         });
     }
 
     function promptForInitials(newScore) {
+        // 기존 modal이 있으면 제거
+        const existingModal = document.getElementById('initialsModal');
+        if (existingModal) existingModal.remove();
+
         const modal = document.createElement('div');
         modal.id = 'initialsModal';
         modal.innerHTML = `<h2>NEW WORLD RECORD!</h2><p>Score: ${newScore}<br>ENTER YOUR NAME</p><input type="text" id="initialsInput" maxlength="10"><button id="submitInitials">SAVE</button>`;
@@ -684,7 +708,8 @@
             btn.innerText = "SAVING...";
             btn.disabled = true;
 
-            await addScoreToDB(newScore, val, JSON.parse(JSON.stringify(game.replayData)));
+            // 저장 시 리플레이 데이터는 game.replayData를 사용합니다.
+            await addScoreToDB(newScore, val, game.replayData);
             
             modal.remove();
         };
@@ -698,13 +723,38 @@
         input.onkeydown = (e) => { if(e.key==='Enter') submit(); };
     }
 
+    // --- [수정] 반응형 로직 개선 (PC, 모바일 비율 유지) ---
     function resize() {
-        const aspect = 4 / 6; 
-        let w = window.innerWidth;
-        let h = window.innerHeight;
-        if (w / h > aspect) { w = h * aspect; } else { h = w / aspect; }
-        wrapper.style.width = `${w}px`; wrapper.style.height = `${h}px`;
-        game.width = w; game.height = h; canvas.width = w; canvas.height = h;
+        const ASPECT_RATIO = 4 / 6; // 원하는 게임 화면 비율 (가로:세로)
+        const parentW = window.innerWidth;
+        const parentH = window.innerHeight;
+        let w, h;
+
+        if (parentW / parentH > ASPECT_RATIO) {
+            // 현재 창의 가로가 더 길면 (데스크톱, 가로 모바일) -> 높이에 맞춰 너비 계산
+            h = parentH;
+            w = h * ASPECT_RATIO;
+        } else {
+            // 현재 창의 세로가 더 길면 (세로 모바일) -> 너비에 맞춰 높이 계산 (사용자가 요청한 방식)
+            w = parentW;
+            h = w / ASPECT_RATIO;
+        }
+
+        // 최대 크기를 넘지 않도록 제한
+        const MAX_WIDTH = 600; 
+        const MAX_HEIGHT = 900;
+        if (w > MAX_WIDTH) {
+            w = MAX_WIDTH;
+            h = MAX_HEIGHT;
+        }
+
+        wrapper.style.width = `${w}px`; 
+        wrapper.style.height = `${h}px`;
+        game.width = w; 
+        game.height = h; 
+        canvas.width = w; 
+        canvas.height = h;
+
         initStars();
     }
     
@@ -727,7 +777,10 @@
         game.score = 0; game.combo = 0; game.cameraY = 0;
         game.baseHue = Math.floor(Math.random() * 360); game.flashAlpha = 0;
         
-        if (!isDemo || !game.currentSong) { game.currentSong = SONGS[Math.floor(Math.random() * SONGS.length)]; }
+        if (!isDemo || !game.currentSong) { 
+             // 노래가 없다면 랜덤으로 선택
+             game.currentSong = SONGS[Math.floor(Math.random() * SONGS.length)]; 
+        }
 
         ui.score.innerText = "0"; ui.score.classList.remove('score-pop'); 
         
@@ -771,10 +824,12 @@
         if (game.state !== 'playing' && game.state !== 'demo') return;
         const curr = game.current; const prev = game.blocks[game.blocks.length-1];
         const dist = curr.x - prev.x; const absDist = Math.abs(dist);
-        const moveData = { x: curr.x, y: curr.y, w: curr.w, h: curr.h, hue: curr.hue, dir: curr.dir, speed: curr.speed, isShining: curr.isShining };
+        
+        // 리플레이 데이터에 블록을 놓은 시점의 시간과 블록 상태를 기록
+        game.replayData.push({ time: performance.now(), x: curr.x, y: curr.y, w: curr.w, h: curr.h, hue: curr.hue, dir: curr.dir, speed: curr.speed, isShining: curr.isShining });
 
         if (absDist >= curr.w) {
-            moveData.result = 'fail'; game.replayData.push(moveData);
+            // 실패
             game.debris.push(createDebris(curr.x, curr.y, curr.w, curr.h, curr.hue));
             if (game.state === 'demo') { initGame(true); } else { gameOver(); }
             return;
@@ -792,6 +847,7 @@
             }
             if (growth > 0) {
                 const blockCenter = newX + prev.w / 2; const screenCenter = game.width / 2;
+                // 블록을 중앙에 가깝게 유지하려는 로직
                 if (Math.abs(blockCenter - screenCenter) < 1) { newX -= growth / 2; } 
                 else if (blockCenter < screenCenter) { } else { newX -= growth; }
             }
@@ -803,10 +859,10 @@
             createEdgeBurst(newX, curr.y, newW, CFG.blockHeight, curr.hue);
         }
 
-        moveData.result = 'success'; moveData.finalX = newX; game.replayData.push(moveData);
         game.blocks.push({ x: newX, y: curr.y, w: newW, h: CFG.blockHeight, hue: curr.hue });
         game.score++; ui.score.innerText = game.score; triggerScoreEffect();
-        AudioSys.playStack(game.combo); spawnBlock();
+        AudioSys.playStack(game.combo); 
+        spawnBlock();
     }
 
     function triggerScoreEffect() {
@@ -867,7 +923,7 @@
         game.state = 'gameover';
         AudioSys.playFail();
         const score = game.score;
-        const isHigh = highScores.length < 10 || score > highScores[highScores.length-1].score;
+        const isHigh = highScores.length < MAX_RANKING_COUNT || score > highScores[highScores.length-1].score;
         setTimeout(() => {
             ui.title.innerText = "GAME OVER";
             ui.menu.classList.add('game-over-mode');
@@ -883,7 +939,7 @@
     function startReplay(data) {
         if(!data || !data.length) return;
         game.state = 'replay';
-        game.replayQueue = JSON.parse(JSON.stringify(data));
+        game.replayQueue = data; // 이미 객체 배열입니다.
         game.replayIndex = 0;
         game.blocks = []; game.debris = []; game.particles = []; game.score = 0; game.cameraY = 0;
         ui.score.innerText = "0";
@@ -892,46 +948,116 @@
         ui.replayIndicator.classList.remove('display-none');
         ui.closeReplayBtn.classList.remove('display-none');
         const startX = (game.width - CFG.baseWidth) / 2;
+        // 첫 번째 블록은 항상 고정된 위치에 (base block)
         game.blocks.push({ x: startX, y: game.height - 150, w: CFG.baseWidth, h: CFG.blockHeight, hue: game.replayQueue[0].hue - 10 });
+        
+        // --- 리플레이 타이밍 초기화 ---
+        game.replayStartTime = performance.now();
         prepareReplayStep();
     }
     function stopReplay() { initGame(true); }
+
     function prepareReplayStep() {
-        if(game.replayIndex >= game.replayQueue.length) return;
+        if(game.replayIndex >= game.replayQueue.length) {
+            // 리플레이 종료 시, 데모 모드로 돌아갑니다.
+            setTimeout(stopReplay, 1000); 
+            return;
+        }
         const d = game.replayQueue[game.replayIndex];
         const prev = game.blocks[game.blocks.length-1];
-        game.current = { x: d.dir===1?-d.w:game.width, targetX: d.x, y: prev.y-CFG.blockHeight, w: d.w, h: d.h, hue: d.hue, dir: d.dir, speed: d.speed, isShining: d.isShining, result: d.result };
+
+        // 목표 x 위치를 계산하여 저장 (여기서는 이전 블록과 맞추려는 위치)
+        const targetX = d.x; 
+
+        // 현재 블록의 시작 위치 설정
+        game.current = { 
+            x: d.dir===1 ? -d.w : game.width, // 화면 밖에서 시작
+            targetX: targetX, // 블록이 멈춰야 할 최종 x 위치
+            y: prev.y - CFG.blockHeight, 
+            w: prev.w, // 이전 블록의 폭으로 시작
+            h: d.h, 
+            hue: d.hue, 
+            dir: d.dir, 
+            speed: d.speed, 
+            isShining: d.isShining,
+            timestamp: d.time || 0 // 플레이어가 블록을 놓은 시간 (없으면 0)
+        };
     }
+    
+    // --- [수정] 리플레이 재생 로직 개선 (dt 기반 이동 및 블록 놓는 로직 통합) ---
     function updateReplay(dt) {
-        const c = game.current; if(!c) return;
+        const c = game.current; 
+        if (!c) return;
+
+        // 1. 블록 이동
+        // 리플레이에서 저장된 속도로 이동
         c.x += c.speed * c.dir * dt;
-        let reached = (c.dir===1 && c.x>=c.targetX) || (c.dir===-1 && c.x<=c.targetX);
-        if(reached) {
-            c.x = c.targetX;
-            if(c.result==='fail') { game.debris.push(createDebris(c.x, c.y, c.w, c.h, c.hue)); AudioSys.playFail(); game.current = null; }
-            else {
-                const prev = game.blocks[game.blocks.length-1];
-                let newX = prev.x, newW = prev.w, isP = false;
-                if(Math.abs(c.x - prev.x) <= CFG.perfectTol) {
-                    game.combo++; isP = true;
-                    if(c.isShining) newW = CFG.baseWidth;
-                    else if(newW < CFG.baseWidth) newW = Math.min(newW + (CFG.baseWidth*CFG.recoveryRate), CFG.baseWidth);
-                    triggerPerfectEffect(newX, c.y, newW, isP);
-                } else {
-                    game.combo = 0; newW = c.w - Math.abs(c.x - prev.x); newX = c.x - prev.x > 0 ? c.x : prev.x;
-                    const debX = c.x - prev.x > 0 ? c.x + newW : c.x;
-                    game.debris.push(createDebris(debX, c.y, Math.abs(c.x - prev.x), c.h, c.hue));
-                    createEdgeBurst(newX, c.y, newW, CFG.blockHeight, c.hue);
-                }
-                game.blocks.push({ x: newX, y: c.y, w: newW, h: CFG.blockHeight, hue: c.hue });
-                game.score++; ui.score.innerText = game.score; triggerScoreEffect(); 
-                // --- Replay Sound Fix: Add audio playback here ---
-                AudioSys.playStack(game.combo); 
-                // ---------------------------------------------------
-                game.replayIndex++; prepareReplayStep();
+
+        // 2. 블록 놓기 조건 확인: 현재 블록의 x 위치가 목표 위치(targetX)를 지나쳤는지 확인
+        let overshoot = (c.dir === 1 && c.x >= c.targetX) || (c.dir === -1 && c.x <= c.targetX);
+
+        if (overshoot) {
+            // 3. 목표 위치에 도달했으므로 블록을 놓는 처리를 수행
+            c.x = c.targetX; // 정확한 목표 위치로 수정
+            
+            const prev = game.blocks[game.blocks.length-1];
+            const dist = c.x - prev.x; 
+            const absDist = Math.abs(dist);
+
+            if (absDist >= c.w) {
+                // 이전에 'fail' 기록이 있었다는 의미.
+                game.debris.push(createDebris(c.x, c.y, c.w, c.h, c.hue)); 
+                AudioSys.playFail(); 
+                game.current = null;
+                game.replayIndex++; // 다음 스텝으로 이동
+                prepareReplayStep();
+                return;
             }
+
+            let newX = prev.x, newW = prev.w, isP = false;
+
+            if (absDist <= CFG.perfectTol) {
+                // 성공 (PERFECT)
+                game.combo++; isP = true;
+                if(c.isShining) newW = CFG.baseWidth;
+                else if(newW < CFG.baseWidth) newW = Math.min(newW + (CFG.baseWidth*CFG.recoveryRate), CFG.baseWidth);
+                
+                // Perfect에 따른 위치 조정 로직 재적용 (옵션)
+                const blockCenter = c.x + c.w / 2; const screenCenter = game.width / 2;
+                let growth = newW - prev.w;
+                if (growth > 0) {
+                    if (Math.abs(blockCenter - screenCenter) < 1) { newX -= growth / 2; } 
+                    else if (blockCenter >= screenCenter) { newX -= growth; }
+                }
+
+                triggerPerfectEffect(newX, c.y, newW, isP);
+            } else {
+                // 성공 (GOOD)
+                game.combo = 0; 
+                newW = c.w - absDist;
+                
+                // 자투리 블록 처리
+                if (dist > 0) { // 블록이 오른쪽으로 움직였고, 오른쪽에 자투리
+                    newX = c.x; 
+                    game.debris.push(createDebris(c.x + newW, c.y, absDist, c.h, c.hue));
+                } else { // 블록이 왼쪽으로 움직였고, 왼쪽에 자투리
+                    newX = prev.x; 
+                    game.debris.push(createDebris(c.x, c.y, absDist, c.h, c.hue));
+                }
+                createEdgeBurst(newX, c.y, newW, CFG.blockHeight, c.hue);
+            }
+
+            // 새 블록 스택에 추가
+            game.blocks.push({ x: newX, y: c.y, w: newW, h: CFG.blockHeight, hue: c.hue });
+            game.score++; ui.score.innerText = game.score; triggerScoreEffect(); 
+            AudioSys.playStack(game.combo); 
+            
+            // 4. 다음 스텝 준비
+            game.replayIndex++; 
+            prepareReplayStep();
         }
     }
+
 
     function getGradient(ctx, x, y, w, h, hue) {
         const grad = ctx.createLinearGradient(x, y, x + w, y + h);
