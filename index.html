@@ -510,6 +510,26 @@
     /**
      * NEON STACK RHYTHM TOWER (속도 복원 및 블록 비율 1/3 적용)
      */
+    
+    // --- [추가] 기준 해상도 및 속도/비율 상수 정의 ---
+    const REF_WIDTH = 400;  // 기준 너비 (이 너비에서 CFG 값이 정의됨)
+    const REF_HEIGHT = 600; // 기준 높이
+    const SPEED_FACTOR = 0.9; // 전체 속도 10% 감소 (1.0 -> 0.9)
+
+    // 기준 물리 상수 (Reference Configuration)
+    const CFG_REF = {
+        blockHeight: 40,
+        startSpeed: 450, 
+        speedInc: 7.5,
+        perfectTol: 5,
+        recoveryRate: 0.10, 
+        shiningProb: 0.05,
+        starCount: 600, 
+        starSpeed: 45, 
+        gravity: 2700,
+        debrisRot: 15,
+        particleDecay: 3.0
+    };
 
     const canvas = document.getElementById('gameCanvas');
     const wrapper = document.getElementById('game-wrapper');
@@ -531,21 +551,21 @@
         loading: document.getElementById('loading-indicator')
     };
 
-    // --- Delta Time Config (속도 복원) ---
+    // --- Delta Time Config (게임 내에서 동적으로 조정될 CFG) ---
     // All units converted to Per Second
-    const CFG = {
-        blockHeight: 40,
-        baseWidth: 0, // 동적으로 설정될 값
-        startSpeed: 450, // 원래 속도로 복원 (Was 675 -> 450)
-        speedInc: 7.5, // 원래 속도로 복원 (Was 11.25 -> 7.5)
-        perfectTol: 5,
-        recoveryRate: 0.10, 
-        shiningProb: 0.05,
-        starCount: 600, 
-        starSpeed: 45, // 원래 속도로 복원 (Was 67.5 -> 45)
-        gravity: 2700,   // 원래 속도로 복원 (Was 4050 -> 2700)
-        debrisRot: 15, // 원래 속도로 복원 (Was 22.5 -> 15)
-        particleDecay: 3.0 // 원래 속도로 복원 (Was 4.5 -> 3.0)
+    let CFG = {
+        blockHeight: 0,
+        baseWidth: 0, 
+        startSpeed: 0,
+        speedInc: 0,
+        perfectTol: 0,
+        recoveryRate: CFG_REF.recoveryRate, // 비율에 관계없이 일정
+        shiningProb: CFG_REF.shiningProb, // 비율에 관계없이 일정
+        starCount: CFG_REF.starCount, // 갯수는 일정
+        starSpeed: 0,
+        gravity: 0,
+        debrisRot: 0,
+        particleDecay: 0
     };
 
     let game = {
@@ -566,8 +586,8 @@
         replayQueue: [],
         replayIndex: 0,
         currentSong: null,
-        replayStartTime: 0, // 리플레이 시작 시간을 저장할 필드 추가
-        replayCurrentTime: 0 // 리플레이 재생 경과 시간을 저장할 필드 추가
+        replayStartTime: 0, 
+        replayCurrentTime: 0 
     };
     let highScores = [];
     let lastTime = 0;
@@ -725,9 +745,9 @@
         input.onkeydown = (e) => { if(e.key==='Enter') submit(); };
     }
 
-    // --- [수정] 반응형 로직 개선 (PC, 모바일 비율 유지 및 블록 크기 동적 계산) ---
+    // --- [수정] 반응형 로직 개선 및 모든 요소 스케일링 적용 ---
     function resize() {
-        const ASPECT_RATIO = 4 / 6; // 원하는 게임 화면 비율 (가로:세로)
+        const ASPECT_RATIO = REF_WIDTH / REF_HEIGHT; // 원하는 게임 화면 비율 (4:6)
         const parentW = window.innerWidth;
         const parentH = window.innerHeight;
         let w, h;
@@ -757,8 +777,26 @@
         canvas.width = w; 
         canvas.height = h;
 
-        // --- [추가] 블록 너비를 캔버스 너비의 1/3로 동적 설정 ---
+        // --- [추가] 스케일 팩터 계산 및 CFG 업데이트 ---
+        const scale = w / REF_WIDTH;
+        const speedScale = scale * SPEED_FACTOR; // 속도는 크기 변화와 전체 속도 감소(0.9)를 모두 적용
+
+        // 1. 블록 너비 (캔버스 너비의 1/3)
         CFG.baseWidth = Math.floor(w / 3); 
+        
+        // 2. 물리 상수를 스케일에 맞게 조정
+        CFG.blockHeight = CFG_REF.blockHeight * scale;
+        CFG.perfectTol = CFG_REF.perfectTol * scale;
+        
+        // 3. 속도 관련 상수를 스케일과 10% 감소에 맞게 조정
+        CFG.startSpeed = CFG_REF.startSpeed * speedScale;
+        CFG.speedInc = CFG_REF.speedInc * speedScale;
+        CFG.starSpeed = CFG_REF.starSpeed * speedScale;
+        
+        // 4. 가속도 관련 상수를 스케일과 10% 감소에 맞게 조정 (가속도는 거리/시간^2 이므로 속도와 동일하게 스케일링)
+        CFG.gravity = CFG_REF.gravity * speedScale; 
+        CFG.debrisRot = CFG_REF.debrisRot * speedScale; 
+        CFG.particleDecay = CFG_REF.particleDecay * speedScale; 
 
         initStars();
     }
@@ -768,7 +806,9 @@
         for (let i = 0; i < CFG.starCount; i++) {
             game.stars.push({
                 x: Math.random() * game.width, y: Math.random() * game.height,
-                size: Math.random() * 2 + 0.5, speed: Math.random() * CFG.starSpeed + 0.2,
+                // 별 크기도 스케일에 맞춰 조정
+                size: (Math.random() * 2 + 0.5) * (game.width / REF_WIDTH), 
+                speed: Math.random() * CFG.starSpeed + 0.2,
                 opacity: Math.random() * 0.5 + 0.3, twinkleSpeed: Math.random() * 0.05 + 0.01
             });
         }
@@ -827,7 +867,7 @@
         // Calculate speed based on score (time based)
         const cycle = game.score % 60;
         const speedFactor = cycle < 30 ? cycle : (60 - cycle);
-        // 속도 계산 로직은 원래대로 복원된 CFG 값을 사용
+        // 속도 계산 로직은 동적으로 조정된 CFG 값을 사용
         const currentSpeed = CFG.startSpeed + (speedFactor * CFG.speedInc);
 
         game.current = { x: 0, y: prev.y - CFG.blockHeight, w: prev.w, h: CFG.blockHeight, hue: game.baseHue, dir: Math.random()<0.5?1:-1, speed: currentSpeed, isShining: isShining };
@@ -899,20 +939,26 @@
     }
 
     function createDebris(x, y, w, h, hue) {
-        // 원래 속도로 복원
+        // 동적으로 조정된 CFG.gravity 사용
+        // vx, vy 값도 스케일링 필요
+        const scale = game.width / REF_WIDTH;
+        const speedScale = scale * SPEED_FACTOR;
         return { 
             x: x, y: y, w: w, h: h, hue: hue, 
-            vx: (Math.random()-0.5)*100, // 150 -> 100
-            vy: (Math.random()-0.5)*100 - 67, // 150 -> 100, 100 -> 67
-            rot: 0, rotSpeed: (Math.random()-0.5)*10 
+            vx: (Math.random()-0.5) * (100 * speedScale), 
+            vy: (Math.random()-0.5) * (100 * speedScale) - (67 * speedScale), 
+            rot: 0, rotSpeed: (Math.random()-0.5) * CFG.debrisRot / 15 * 10 
         };
     }
 
     function createEdgeBurst(x, y, w, h, hue) {
-        const perimeter = (w + h) * 2; const count = Math.min(40, Math.floor(perimeter / 6)); 
+        const scale = game.width / REF_WIDTH;
+        const speedScale = scale * SPEED_FACTOR;
+        const perimeter = (w + h) * 2; 
+        const count = Math.min(40, Math.floor(perimeter / (6 * scale))); // 파티클 밀도는 비슷하게 유지
         for (let i = 0; i < count; i++) {
             const pos = Math.random() * perimeter; let px, py, vx, vy; 
-            const speed = Math.random() * 67 + 33; // 속도 범위 조정 (100+50 -> 67+33)
+            const speed = Math.random() * (67 * speedScale) + (33 * speedScale); // 속도 범위 조정
 
             if (pos < w) { px = x + pos; py = y; vx = (Math.random() - 0.5) * speed; vy = -speed; } 
             else if (pos < w + h) { px = x + w; py = y + (pos - w); vx = speed; vy = (Math.random() - 0.5) * speed; } 
@@ -983,32 +1029,51 @@
         const d = game.replayQueue[game.replayIndex];
         const prev = game.blocks[game.blocks.length-1];
 
-        // 다음 블록의 목표 위치와 스펙을 설정
-        const targetX = d.x; 
+        // 리플레이 데이터의 물리량을 현재 스케일에 맞게 조정
+        const scale = game.width / REF_WIDTH;
+        const scaledX = (d.x / (REF_WIDTH / d.w)) * (game.width / CFG.baseWidth); // x 위치는 동적 비율에 맞게 스케일링 필요
+        
+        // 블록이 놓여야 할 최종 X 위치 (기준 해상도에서 기록된 x 값은 비율 기반이므로 현재 캔버스 기준으로 다시 계산)
+        // 리플레이 데이터의 x, w, speed는 플레이 당시의 동적 CFG.baseWidth를 기준으로 기록된 상대 좌표라고 가정하고,
+        // 여기서는 저장된 raw x 값과 raw w 값을 사용했습니다. 이 부분이 비율 변화 후 리플레이가 이상해지는 원인이 될 수 있습니다.
+        // **해결책: 플레이 당시의 w(d.w)와 현재 블록 w(prev.w)를 기준으로 상대적인 위치를 계산합니다.**
+        
+        // 현재 블록 폭(prev.w) 기준으로, 기록된 x 위치(d.x)가 스택 블록(prev)에 놓였던 비율을 유지하여 최종 x 위치를 계산합니다.
+        // d.x, d.w는 플레이 당시의 픽셀 값입니다. 새로운 targetX는 현재 화면에 맞게 조정된 비율을 반영해야 합니다.
 
-        // 현재 블록의 시작 위치 설정
+        // 플레이 당시의 블록 크기와 현재 블록 크기의 비율을 통해 오프셋을 계산
+        const lastBlock = game.blocks[game.blocks.length - 1];
+        const replayScaleFactor = lastBlock.w / d.w;
+        const targetX = lastBlock.x + (d.x - (d.dir === 1 ? -d.w : REF_WIDTH)) * replayScaleFactor;
+        
+        // 현재 블록의 스펙은 이전 블록의 폭(prev.w)를 기반으로 합니다.
+        // 리플레이 데이터의 d.w는 실제 픽셀 값이 아니라 플레이 당시의 블록 너비를 나타냅니다.
+        // 리플레이 데이터를 재사용하기 위해, d.x는 항상 플레이 당시의 x 좌표를 저장하고,
+        // 현재 게임에서는 이 x 좌표가 현재 캔버스 크기에 비례하여 이동해야 합니다.
+
+        // **가장 정확한 방법: d.x를 스케일링 후 사용**
+        // d.x, d.w는 플레이 당시의 REF_WIDTH에 대한 상대적인 픽셀 값이라고 가정합니다.
+        const scaled_d_x = d.x * scale;
+        const scaled_d_w = d.w * scale;
+
         game.current = { 
-            x: d.dir===1 ? -d.w : game.width, // 화면 밖에서 시작
-            targetX: targetX, // 블록이 멈춰야 할 최종 x 위치
+            x: d.dir===1 ? -scaled_d_w : game.width, // 화면 밖에서 시작
+            targetX: scaled_d_x, // 블록이 멈춰야 할 최종 x 위치 (스케일링된 값)
             y: prev.y - CFG.blockHeight, 
-            w: prev.w, // 이전 블록의 폭으로 시작
-            h: d.h, 
+            w: scaled_d_w, // 리플레이 당시의 블록 폭(w)을 현재 스케일링
+            h: CFG.blockHeight, 
             hue: d.hue, 
             dir: d.dir, 
-            speed: d.speed, 
+            // 속도도 현재 스케일에 맞게 조정 (플레이 당시의 속도를 다시 스케일링)
+            speed: d.speed * (game.width / REF_WIDTH) * SPEED_FACTOR / (REF_WIDTH/d.w), // 이전에 저장된 속도를 사용하되, 현재 스케일 팩터를 적용해야 함 (이 부분을 수정하지 않으면 느려짐)
             isShining: d.isShining,
             
-            // 리플레이 데이터의 시간 기록을 가져와서 목표 시간으로 설정 (밀리초)
             targetTime: d.time || 0,
             
-            // 블록이 이동해야 할 총 거리
-            distance: Math.abs(targetX - (d.dir===1 ? -d.w : game.width))
+            // distance와 expectedDuration은 시간 기반 이동에서 더 이상 사용되지 않음
+            distance: 0,
+            expectedDuration: 0
         };
-        // 블록이 움직이기 시작한 시간 (이전 블록을 놓은 시간)을 기록
-        game.current.startTime = game.replayCurrentTime; 
-        
-        // 블록이 목표 X 위치에 도달하는 데 걸리는 예상 시간 (초)
-        game.current.expectedDuration = game.current.distance / game.current.speed;
     }
     
     // --- 리플레이 재생 로직: 시간 동기화 기반 (유지) ---
@@ -1019,21 +1084,20 @@
         // 리플레이 경과 시간 업데이트 (dt: 초 단위)
         game.replayCurrentTime += dt * 1000; // 밀리초 단위로 관리
 
-        // 1. 시간 기반 블록 놓기 조건 확인:
-        // 현재 경과 시간이 다음 블록이 놓여야 할 목표 시간(`targetTime`)을 초과했는지 확인합니다.
         if (game.replayCurrentTime >= c.targetTime) {
             // 3. 목표 시간에 도달했으므로 블록을 놓는 처리를 수행
             
-            // 블록이 놓여야 할 최종 X 위치를 미리 계산하거나, 기록된 위치(`c.targetX`)를 사용합니다.
-            // 여기서는 기록된 위치(`c.targetX`)를 사용하고, `c.x`를 그 위치로 강제 이동시킵니다.
+            // 블록이 놓여야 할 최종 X 위치를 기록된 targetX(스케일링된 값)로 강제 이동
             c.x = c.targetX; 
             
             const prev = game.blocks[game.blocks.length-1];
+            // dist와 absDist 계산 시, 현재 c.w 대신 prev.w를 사용해야 정확함 (놓을 때의 기준은 이전 블록)
             const dist = c.x - prev.x; 
             const absDist = Math.abs(dist);
 
-            if (absDist >= c.w) {
+            if (absDist >= prev.w * 2) { // 실패 조건은 현재 블록 너비 기준으로 확인
                 // 이전에 'fail' 기록이 있었다는 의미 (실제 게임에서는 이 조건으로 실패가 결정됨).
+                // 여기서 c.w는 리플레이 데이터에서 온 스케일링된 w 값입니다.
                 game.debris.push(createDebris(c.x, c.y, c.w, c.h, c.hue)); 
                 AudioSys.playFail(); 
                 game.current = null;
@@ -1046,13 +1110,20 @@
 
             if (absDist <= CFG.perfectTol) {
                 // 성공 (PERFECT)
-                game.combo++; isP = true;
-                if(c.isShining) newW = CFG.baseWidth;
-                else if(newW < CFG.baseWidth) newW = Math.min(newW + (CFG.baseWidth*CFG.recoveryRate), CFG.baseWidth);
+                newX = prev.x; // Perfect는 이전 블록과 x 위치 동일
+                newW = prev.w; 
+                game.combo++; 
+                isP = true;
                 
-                // Perfect에 따른 위치 조정 로직 재적용 (옵션)
-                const blockCenter = c.x + c.w / 2; const screenCenter = game.width / 2;
-                let growth = newW - prev.w;
+                let growth = 0;
+                if(c.isShining) { growth = CFG.baseWidth - newW; newW = CFG.baseWidth; }
+                else if(newW < CFG.baseWidth) {
+                    const potentialW = Math.min(newW + (CFG.baseWidth * CFG.recoveryRate), CFG.baseWidth);
+                    growth = potentialW - newW; newW = potentialW;
+                }
+                
+                // Perfect에 따른 위치 조정
+                const blockCenter = newX + prev.w / 2; const screenCenter = game.width / 2;
                 if (growth > 0) {
                     if (Math.abs(blockCenter - screenCenter) < 1) { newX -= growth / 2; } 
                     else if (blockCenter >= screenCenter) { newX -= growth; }
@@ -1062,15 +1133,15 @@
             } else {
                 // 성공 (GOOD)
                 game.combo = 0; 
-                newW = c.w - absDist;
+                newW = prev.w - absDist; // 이전 블록 폭에서 잘린 만큼 뺀다.
                 
                 // 자투리 블록 처리
                 if (dist > 0) { // 블록이 오른쪽으로 움직였고, 오른쪽에 자투리
-                    newX = c.x; 
-                    game.debris.push(createDebris(c.x + newW, c.y, absDist, c.h, c.hue));
-                } else { // 블록이 왼쪽으로 움직였고, 왼쪽에 자투리
                     newX = prev.x; 
-                    game.debris.push(createDebris(c.x, c.y, absDist, c.h, c.hue));
+                    game.debris.push(createDebris(prev.x + newW, c.y, absDist, c.h, c.hue));
+                } else { // 블록이 왼쪽으로 움직였고, 왼쪽에 자투리
+                    newX = c.x; // 새 블록의 X 위치는 현재 c.x (targetX)
+                    game.debris.push(createDebris(prev.x, c.y, absDist, c.h, c.hue));
                 }
                 createEdgeBurst(newX, c.y, newW, CFG.blockHeight, c.hue);
             }
@@ -1081,14 +1152,13 @@
             AudioSys.playStack(game.combo); 
             
             // 4. 다음 스텝 준비
-            game.current = null; // 현재 블록 처리가 끝났으므로 null로 설정
+            game.current = null; 
             game.replayIndex++; 
             prepareReplayStep();
             
         } else {
             // 2. 블록 이동 (아직 목표 시간이 되지 않았다면)
             
-            // 목표 시간까지 남은 거리를 비율로 계산하여 부드럽게 이동
             const prevTime = game.replayIndex > 0 ? game.replayQueue[game.replayIndex - 1].time : 0;
             const elapsed = game.replayCurrentTime - prevTime;
             const duration = c.targetTime - prevTime;
@@ -1097,10 +1167,10 @@
             if (duration > 0) {
                 progress = Math.min(1, elapsed / duration);
             } else {
-                // duration이 0이거나 음수일 경우 (예외 상황) 즉시 목표 위치로 이동
                 progress = 1;
             }
 
+            // 블록의 시작 위치는 prepareReplayStep에서 설정한 값입니다.
             const startX = c.dir===1 ? -c.w : game.width;
             c.x = startX + (c.targetX - startX) * progress;
         }
@@ -1134,7 +1204,9 @@
         }
 
         if(game.blocks.length > 0) {
-            const ty = (game.blocks.length*CFG.blockHeight)-(game.height*0.4);
+            // 카메라 높이도 스케일에 맞게 조정
+            const camera_ref_pos = 150 * (game.height / REF_HEIGHT); // 하단에서 150px
+            const ty = (game.blocks.length*CFG.blockHeight)-(game.height - camera_ref_pos); 
             // Camera lerp with DT (approx exponential decay)
             game.cameraY += (Math.max(0, ty)-game.cameraY) * 5.0 * dt; 
         }
@@ -1181,15 +1253,18 @@
             if(p.life<=0) { game.particles.splice(i,1); continue; }
             
             if(p.type==='radial-wave') {
-                ctx.strokeStyle=`hsla(${p.hue},100%,80%,${p.life})`; ctx.lineWidth=3;
+                ctx.strokeStyle=`hsla(${p.hue},100%,80%,${p.life})`; 
+                ctx.lineWidth=3 * (game.width / REF_WIDTH); // 선 굵기도 스케일링
                 p.size += (p.max_size - p.size) * 5.0 * dt;
                 ctx.beginPath(); ctx.arc(p.x, p.y+game.cameraY, p.size, 0, Math.PI*2); ctx.stroke();
             } else {
                 p.x += p.vx * dt; 
                 p.y += p.vy * dt; 
                 ctx.fillStyle=p.color; ctx.globalAlpha=p.life;
-                if(p.type==='burst' && p.color === '#FFEA00') { ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI*2); ctx.fill(); } 
-                else { ctx.beginPath(); ctx.arc(p.x, p.y+game.cameraY, 3, 0, Math.PI*2); ctx.fill(); }
+                
+                const particleSize = 3 * (game.width / REF_WIDTH); // 파티클 크기 스케일링
+                if(p.type==='burst' && p.color === '#FFEA00') { ctx.beginPath(); ctx.arc(p.x, p.y, 2 * (game.width / REF_WIDTH), 0, Math.PI*2); ctx.fill(); } 
+                else { ctx.beginPath(); ctx.arc(p.x, p.y+game.cameraY, particleSize, 0, Math.PI*2); ctx.fill(); }
                 ctx.globalAlpha=1;
             }
         }
