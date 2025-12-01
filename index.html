@@ -758,7 +758,11 @@
         // 블록 두 칸 아래로 내려서 시작 위치 조정
         const initial_offset = 150; // 기존 하단 여백 기준값
         const offset_adjustment = 2; // 블록 2칸만큼 아래로 내림
-        const startY = game.height - initial_offset + (offset_adjustment * game_config.blockHeight);
+        
+        // **수정 시작: 시작 블록의 y 위치를 한 블록 높이만큼 위로 올림**
+        const startY = game.height - initial_offset + (offset_adjustment * game_config.blockHeight) - game_config.blockHeight;
+        // const startY = game.height - initial_offset + (1 * game_config.blockHeight); 와 동일
+        // **수정 끝**
 
         const baseBlock = { x: (game.width-game_config.baseWidth)/2, y: startY, w: game_config.baseWidth, h: game_config.blockHeight, hue: game.baseHue };
         game.blocks.push(baseBlock);
@@ -927,7 +931,9 @@
         // 리플레이 시작 시 초기 블록 위치 조정
         const initial_offset = 150; // 기존 하단 여백 기준값
         const offset_adjustment = 2; // 블록 2칸만큼 아래로 내림
-        const startY = game.height - initial_offset + (offset_adjustment * game_config.blockHeight);
+        
+        // 시작 블록의 y 위치를 한 블록 높이만큼 위로 올림
+        const startY = game.height - initial_offset + (offset_adjustment * game_config.blockHeight) - game_config.blockHeight;
 
         game.blocks.push({ x: startX, y: startY, w: game_config.baseWidth, h: game_config.blockHeight, hue: game.replayQueue[0].hue - 10 });
         
