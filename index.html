@@ -39,12 +39,12 @@
         /* === SCORE & COMBO UI === */
         #score-container {
             position: absolute; 
-            top: 10%; 
+            top: 10%; /* 점수 위치 (캔버스 높이의 10% 지점) */
             text-align: center;
         }
 
         #score {
-            font-size: 5.4rem; /* 6rem -> 5.4rem (10% 감소) */
+            font-size: 5.4rem; /* 10% 감소된 크기 */
             font-weight: 900; margin: 0; line-height: 1;
             background: linear-gradient(to bottom, #FFFF00, #FFD700);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
@@ -61,7 +61,7 @@
         }
 
         #combo-msg {
-            position: absolute; top: 20%; /* 스코어 위치에 맞춰 조정 */
+            position: absolute; top: 20%; 
             font-size: 2.5rem; font-weight: bold; color: #fff;
             opacity: 0; white-space: nowrap;
             text-shadow: 0 0 20px #0ff, 0 0 40px #0ff;
@@ -74,7 +74,7 @@
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(5px);
             display: flex; flex-direction: column; align-items: center; 
-            justify-content: flex-start; /* TOP 글자 위치 조정을 위해 flex-start로 변경 */
+            justify-content: flex-start;
             padding-top: 0; 
             box-sizing: border-box;
             z-index: 20; pointer-events: auto; cursor: pointer; transition: opacity 0.5s;
@@ -83,22 +83,22 @@
             font-size: 5rem; 
             color: #fff; margin: 0; 
             margin-top: 45vh; /* 캔버스 높이의 45% 지점 */
-            transform: translateY(-50%); /* 텍스트 자체 높이의 절반만큼 위로 올려 정확히 중앙에 배치 */
+            transform: translateY(-50%); 
             text-shadow: 0 0 20px #fff, 0 0 40px rgba(255,255,255,0.5);
             background: none; -webkit-text-fill-color: #fff;
         }
         #intro-screen p {
-            position: absolute; /* TOP 위치 조정에 영향을 주지 않도록 절대 위치 사용 */
-            top: 50%; /* TOP 글자 중앙 아래에 위치하도록 조정 */
-            margin-top: 50px; /* TOP 글자 높이와 간격을 고려한 최종 위치 조정 */
+            position: absolute; 
+            top: 50%; 
+            margin-top: 50px; 
             font-size: 1.2rem; color: #aaa; animation: blink 1s infinite;
             letter-spacing: 2px;
         }
 
         #menu-screen {
-            background: none; backdrop-filter: none; border: none;
             position: absolute; top: 0; left: 0;
             width: 100%; height: 100%;
+            background: none; backdrop-filter: none; border: none;
             padding: 0 0 60px 0; 
             box-sizing: border-box;
             display: flex; flex-direction: column; align-items: center; 
@@ -109,12 +109,11 @@
 
         #menu-screen h1 {
             font-size: 4rem;
-            /* GAME OVER 글자 캔버스 높이의 35% 지점에 오도록 조정 */
-            margin-top: 35%; 
+            margin-top: 35%; /* 캔버스 높이의 35% 지점에 오도록 조정 */
             margin-bottom: auto; 
             text-transform: uppercase;
             font-weight: 900; letter-spacing: 5px;
-            line-height: 0.8; /* 간격 좁힘 유지 */
+            line-height: 0.8; /* GAME OVER 간격 좁힘 유지 */
             width: 80%; 
             word-break: break-word; 
             background: linear-gradient(45deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000);
@@ -125,10 +124,13 @@
             text-align: center;
         }
         
-        .bottom-controls {
-            display: flex; flex-direction: column; align-items: center;
+        /* --- 버튼 컨테이너 관리 (게임 오버 시에만 표시) --- */
+        .bottom-controls { 
+            display: none; /* 기본적으로 숨김 */
+            flex-direction: column; align-items: center;
             pointer-events: auto; margin-bottom: 20px;
         }
+        .game-over-mode .bottom-controls { display: flex; } /* 게임 오버 시 표시 */
 
         @keyframes rainbow { 
             0% { background-position: 0% 50% }
@@ -249,7 +251,7 @@
 
 <div id="game-wrapper">
     <div id="intro-screen">
-        <h1>TOP</h1> <!-- TOP 글자 복원 -->
+        <h1>TOP</h1>
         <p>CLICK TO START</p>
     </div>
 
@@ -276,7 +278,7 @@
         <div id="initialsModal" class="display-none"></div>
 
         <div id="menu-screen" class="hide">
-            <h1>TOP</h1> <!-- TOP 글자 복원 -->
+            <h1>TOP</h1>
             
             <div class="bottom-controls">
                 <button id="start-btn">PLAY</button>
@@ -370,11 +372,6 @@
     
     // --- DB Operations ---
     async function fetchTopScores() {
-        // 랭킹은 모든 사용자가 접근할 수 있는 public 경로를 사용해야 함.
-        // 하지만 현재 Canvas 환경은 쓰기 권한이 사용자 경로에 제한되므로,
-        // 일단 현재 사용자의 스코어만 가져오는 것으로 변경하고,
-        // 랭킹 목록을 보여주지 않거나, 모든 사용자의 데이터에 접근하는 다른 방법을 고려해야 함.
-        // 현재는 쓰기 오류 해결이 목적이므로, 쓰기 경로를 따라가는 것으로 수정.
         if (!currentUser || !db) return [];
         try {
             const scoresCollectionRef = getScoresCollection();
@@ -440,7 +437,7 @@
     const REF_HEIGHT = 1920; // 기준 높이 (Reference Height)
 
     // --- 리플레이 데이터 스케일링을 위한 이전 기준 너비 (저장 시 사용되었던 400px 기준) ---
-    const PREV_REF_WIDTH_FOR_REPLAY = 400;
+    const PREV_REF_WIDTH_FOR_REPLAY = 400; // 과거의 기본 해상도 400px을 기준으로 사용
 
     // --- 2. [블록 너비 기준] 캔버스 너비의 1/3 ---
     const BASE_WIDTH = REF_WIDTH / 3; // 1080 / 3 = 360
@@ -452,7 +449,7 @@
     const OLD_BLOCK_HEIGHT = 72;                
     const OLD_START_SPEED = 729;                
     const OLD_SPEED_INC = 12.15;                
-    const OLD_PERFECT_TOL = 10;                 
+    const OLD_PERFECT_TOL = 11;                 
     const OLD_STAR_SPEED = 72.9;                
     const OLD_GRAVITY = 4374;                   
     const OLD_DEBRIS_ROT = 24.3;                
@@ -463,7 +460,8 @@
     
     const START_SPEED = OLD_START_SPEED;
     const SPEED_INC = OLD_SPEED_INC;
-    const PERFECT_TOL = OLD_PERFECT_TOL; 
+    // --- 퍼펙트 판정 10% 추가 증가 (11 * 1.1 = 12.1) ---
+    const PERFECT_TOL = 12.1; 
     const STAR_SPEED = OLD_STAR_SPEED;
     const GRAVITY = OLD_GRAVITY; 
     const DEBRIS_ROT = OLD_DEBRIS_ROT; 
@@ -533,7 +531,8 @@
         closeReplayBtn: document.getElementById('close-replay-btn'),
         replayIndicator: document.getElementById('replay-indicator'),
         intro: document.getElementById('intro-screen'),
-        loading: document.getElementById('loading-indicator')
+        loading: document.getElementById('loading-indicator'),
+        bottomControls: document.querySelector('.bottom-controls') // 버튼 컨테이너 추가
     };
 
     // =========================================================================
@@ -584,7 +583,7 @@
             let freq = notes[noteIdx];
             const cycleLen = 16; const maxOctave = 1; 
             const cycleStep = Math.floor(game.score / cycleLen);
-            const cycleIndex = cycleStep % (maxOctave * 2);
+            let cycleIndex = cycleStep % (maxOctave * 2);
             let octaveShift = cycleIndex;
             if (cycleIndex > maxOctave) octaveShift = (maxOctave * 2) - cycleIndex;
             freq = freq * 0.5 * Math.pow(2, octaveShift);
@@ -744,6 +743,8 @@
             ui.menu.classList.remove('hide');
             ui.menu.classList.remove('game-over-mode');
             ui.rankingBtn.classList.remove('display-none');
+            // --- 수정: 데모 모드일 때만 PLAY 버튼 표시 ---
+            ui.bottomControls.style.display = 'flex';
             ui.btn.innerText = "PLAY";
             ui.title.innerText = "TOP";
         } else {
@@ -753,16 +754,9 @@
         }
         ui.replayIndicator.classList.add('display-none');
         ui.closeReplayBtn.classList.add('display-none');
-
-        // game_config.baseWidth와 blockHeight 사용
-        // 블록 두 칸 아래로 내려서 시작 위치 조정
-        const initial_offset = 150; // 기존 하단 여백 기준값
-        const offset_adjustment = 2; // 블록 2칸만큼 아래로 내림
         
-        // **수정 시작: 시작 블록의 y 위치를 한 블록 높이만큼 위로 올림**
-        const startY = game.height - initial_offset + (offset_adjustment * game_config.blockHeight) - game_config.blockHeight;
-        // const startY = game.height - initial_offset + (1 * game_config.blockHeight); 와 동일
-        // **수정 끝**
+        // --- 시작 블록 위치를 캔버스 높이의 90% 지점으로 설정 ---
+        const startY = game.height * 0.90;
 
         const baseBlock = { x: (game.width-game_config.baseWidth)/2, y: startY, w: game_config.baseWidth, h: game_config.blockHeight, hue: game.baseHue };
         game.blocks.push(baseBlock);
@@ -794,42 +788,63 @@
         const curr = game.current; const prev = game.blocks[game.blocks.length-1];
         const dist = curr.x - prev.x; const absDist = Math.abs(dist);
         
-        const timeSinceStart = performance.now() - game.replayStartTime;
-        game.replayData.push({ time: timeSinceStart, x: curr.x, y: curr.y, w: curr.w, h: curr.h, hue: curr.hue, dir: curr.dir, speed: curr.speed, isShining: curr.isShining });
+        // --- 리플레이 데이터 기록 (정규화된 결과 기록으로 전환) ---
+        
+        let newX = curr.x; let newW = curr.w; let isShiningPerfect = false;
 
         if (absDist >= curr.w) {
             game.debris.push(createDebris(curr.x, curr.y, curr.w, curr.h, curr.hue));
-            if (game.state === 'demo') { initGame(true); } else { gameOver(); }
-            return;
-        }
-
-        let newX = curr.x; let newW = curr.w; let isShiningPerfect = false;
-
-        if (absDist <= game_config.perfectTol) {
-            newX = prev.x; newW = prev.w; game.combo++;
-            let growth = 0;
-            if (curr.isShining) { growth = game_config.baseWidth - newW; newW = game_config.baseWidth; isShiningPerfect = true; }
-            else if (newW < game_config.baseWidth) {
-                const potentialW = Math.min(newW + (game_config.baseWidth * game_config.recoveryRate), game_config.baseWidth);
-                growth = potentialW - newW; newW = potentialW;
-            }
-            if (growth > 0) {
-                const blockCenter = newX + prev.w / 2; const screenCenter = game.width / 2;
-                if (Math.abs(blockCenter - screenCenter) < 1) { newX -= growth / 2; } 
-                else if (blockCenter < screenCenter) { } else { newX -= growth; }
-            }
-            triggerPerfectEffect(newX, curr.y, newW, isShiningPerfect);
+            if (game.state === 'demo') { /* 데모 모드에서는 리셋을 막았으므로 여기는 미사용 */ } else { gameOver(); }
+            // 게임 오버/실패 시에도 최종 결과(잘림) 기록
+            newX = curr.x; // 실패 시의 블록 위치 (잘린 부분의 시작)
+            newW = 0;      // 실패 시의 블록 너비 (0으로 기록)
+            
         } else {
-            game.combo = 0; newW = curr.w - absDist;
-            if (dist > 0) { newX = curr.x; game.debris.push(createDebris(curr.x + newW, curr.y, absDist, curr.h, curr.hue)); }
-            else { newX = prev.x; game.debris.push(createDebris(curr.x, curr.y, absDist, curr.h, curr.hue)); }
-            createEdgeBurst(newX, curr.y, newW, game_config.blockHeight, curr.hue);
-        }
+            // 성공/부분 성공 로직
+            if (absDist <= game_config.perfectTol) {
+                newX = prev.x; newW = prev.w; game.combo++;
+                let growth = 0;
+                if (curr.isShining) { growth = game_config.baseWidth - newW; newW = game_config.baseWidth; isShiningPerfect = true; }
+                else if (newW < game_config.baseWidth) {
+                    const potentialW = Math.min(newW + (game_config.baseWidth * game_config.recoveryRate), game_config.baseWidth);
+                    growth = potentialW - newW; newW = potentialW;
+                }
+                if (growth > 0) {
+                    const blockCenter = newX + prev.w / 2; const screenCenter = game.width / 2;
+                    if (Math.abs(blockCenter - screenCenter) < 1) { newX -= growth / 2; } 
+                    else if (blockCenter < screenCenter) { } else { newX -= growth; }
+                }
+                triggerPerfectEffect(newX, curr.y, newW, isShiningPerfect);
+            } else {
+                game.combo = 0; newW = curr.w - absDist;
+                if (dist > 0) { newX = curr.x; game.debris.push(createDebris(curr.x + newW, curr.y, absDist, curr.h, curr.hue)); }
+                else { newX = prev.x; game.debris.push(createDebris(curr.x, curr.y, absDist, curr.h, curr.hue)); }
+                createEdgeBurst(newX, curr.y, newW, game_config.blockHeight, curr.hue);
+            }
 
-        game.blocks.push({ x: newX, y: curr.y, w: newW, h: game_config.blockHeight, hue: curr.hue });
-        game.score++; ui.score.innerText = game.score; triggerScoreEffect();
-        AudioSys.playStack(game.combo); 
-        spawnBlock();
+            // 블록을 스택에 추가
+            game.blocks.push({ x: newX, y: curr.y, w: newW, h: game_config.blockHeight, hue: curr.hue });
+            game.score++; ui.score.innerText = game.score; triggerScoreEffect();
+            AudioSys.playStack(game.combo); 
+            spawnBlock();
+        }
+        
+        // --- 리플레이 데이터 기록: 최종 결과와 타이밍 기록 ---
+        // curr.x (클릭 순간의 x좌표), newX (절단 후 최종 x좌표), newW (절단 후 최종 너비)
+        game.replayData.push({ 
+            time: performance.now() - game.replayStartTime, 
+            x_norm: curr.x / game.width,        // 클릭 당시 x좌표 (정규화된 움직임 위치)
+            w_norm: prev.w / game.width,        // 이전 블록의 너비 (정규화된 크기)
+            curr_w_norm: curr.w / game.width,   // 현재 움직이는 블록의 크기 (잔해 생성용)
+            newX_norm: newX / game.width,       // 최종 배치 x좌표 (정규화된 결과)
+            newW_norm: newW / game.width,       // 최종 배치 너비 (정규화된 결과)
+            
+            hue: curr.hue, dir: curr.dir, speed: curr.speed, isShining: curr.isShining,
+            canvasWidth: game.width, // 기록 당시 캔버스 너비 (참고용)
+            failed: absDist >= curr.w // 실패 여부 플래그
+        });
+        
+        if (absDist >= curr.w) { return; } // 게임 오버 후 placeBlock의 나머지 로직을 탈출
     }
 
     function triggerScoreEffect() {
@@ -847,7 +862,14 @@
         c.x += c.speed * c.dir * dt;
         const prev = game.blocks[game.blocks.length - 1];
         let hit = (c.dir === 1 && c.x >= prev.x) || (c.dir === -1 && c.x <= prev.x);
-        if (hit) { c.x = prev.x; placeBlock(); } 
+        if (hit) { 
+            c.x = prev.x; 
+            // 데모 모드에서는 절단 로직을 실행하지 않고, 블록을 스택에 완벽하게 추가한 후 다음 블록을 바로 생성
+            game.blocks.push({ x: c.x, y: c.y, w: c.w, h: c.h, hue: c.hue });
+            game.score++; 
+            AudioSys.playStack(game.combo); // 데모 플레이 시 음악 재생
+            spawnBlock(); 
+        } 
         else { if (c.x > game.width + 100 || c.x < -100 - c.w) c.dir *= -1; }
     }
 
@@ -905,6 +927,8 @@
             ui.rankingBtn.classList.add('display-none'); 
             ui.rankingBoard.style.display = 'block'; 
             ui.btn.innerText = "RETRY";
+            // 게임 오버 시 버튼 표시 (bottom-controls)
+            ui.bottomControls.style.display = 'flex';
             ui.menu.classList.remove('hide');
             if(isHigh && score > 0) { promptForInitials(score); }
             else displayHighScores();
@@ -919,26 +943,35 @@
         if(!data || !data.length) return;
         game.state = 'replay';
         game.replayQueue = data;
-        game.replayIndex = 0;
         game.blocks = []; game.debris = []; game.particles = []; game.score = 0; game.cameraY = 0;
         ui.score.innerText = "0";
         ui.menu.classList.add('hide');
         ui.rankingBoard.style.display = 'none'; 
         ui.replayIndicator.classList.remove('display-none');
         ui.closeReplayBtn.classList.remove('display-none');
-        const startX = (game.width - game_config.baseWidth) / 2;
         
-        // 리플레이 시작 시 초기 블록 위치 조정
-        const initial_offset = 150; // 기존 하단 여백 기준값
-        const offset_adjustment = 2; // 블록 2칸만큼 아래로 내림
+        // --- 1. 초기 블록 크기 및 위치 설정 (첫 번째 블록은 항상 완벽) ---
+        const firstReplayStep = game.replayQueue[0];
         
-        // 시작 블록의 y 위치를 한 블록 높이만큼 위로 올림
-        const startY = game.height - initial_offset + (offset_adjustment * game_config.blockHeight) - game_config.blockHeight;
+        // 시작 블록의 Y 위치 (일반 게임 시작 로직과 동일)
+        const startY = game.height * 0.90;
 
-        game.blocks.push({ x: startX, y: startY, w: game_config.baseWidth, h: game_config.blockHeight, hue: game.replayQueue[0].hue - 10 });
+        // 첫 블록은 정중앙, 기준 크기로 시작
+        const baseBlock = { 
+            x: (game.width-game_config.baseWidth)/2, 
+            y: startY, 
+            w: game_config.baseWidth, 
+            h: game_config.blockHeight, 
+            hue: firstReplayStep ? firstReplayStep.hue - 10 : game.baseHue - 10 
+        };
+
+        game.blocks.push(baseBlock);
         
         game.replayStartTime = performance.now();
         game.replayCurrentTime = 0;
+        
+        // 리플레이는 첫 번째 블록 (Base) 다음부터 시작합니다.
+        game.replayIndex = 0; // placeBlock이 모든 스텝을 기록하므로 0부터 시작하고, 첫 번째 스텝을 바로 처리합니다.
         prepareReplayStep();
     }
     
@@ -952,17 +985,24 @@
         const d = game.replayQueue[game.replayIndex];
         const prev = game.blocks[game.blocks.length-1];
 
-        // 리플레이 데이터의 픽셀 값은 이전에 400px 기준으로 기록되었다고 가정하고,
-        // 현재 화면의 너비(game.width)에 맞게 스케일링합니다.
+        // --- 리플레이 데이터 스케일링 (정규화된 값을 현재 캔버스 너비에 맞게 조정) ---
+        const recordedWidth = d.canvasWidth || REF_WIDTH;
+        const scaling_ratio = game.width / recordedWidth; 
         
-        const scaled_d_x = d.x * (game.width / PREV_REF_WIDTH_FOR_REPLAY); 
-        const scaled_d_w = d.w * (game.width / PREV_REF_WIDTH_FOR_REPLAY); 
+        // 이동 블록의 목표 x 좌표 및 크기 (클릭 순간의 상태)
+        const targetX_scaled = d.x_norm * game.width; 
+        const w_scaled = d.w_norm * game.width; 
+        const curr_w_scaled = d.curr_w_norm * game.width; // 현재 움직이는 블록의 크기
         
         game.current = { 
-            x: d.dir===1 ? -scaled_d_w : game.width,
-            targetX: scaled_d_x,
+            x: d.dir===1 ? -curr_w_scaled : game.width, // 시작 위치는 curr_w_scaled 사용
+            targetX: targetX_scaled, // 클릭 당시의 X 위치
+            targetW: d.newW_norm * game.width, // 최종 배치될 너비
+            targetNewX: d.newX_norm * game.width, // 최종 배치될 X 위치
+            failed: d.failed,
+            
             y: prev.y - game_config.blockHeight, 
-            w: scaled_d_w,
+            w: curr_w_scaled, // 움직이는 블록의 크기는 curr_w_scaled 사용
             h: game_config.blockHeight, 
             hue: d.hue, 
             dir: d.dir, 
@@ -982,63 +1022,60 @@
 
         if (game.replayCurrentTime >= c.targetTime) {
             
-            c.x = c.targetX; 
             const prev = game.blocks[game.blocks.length-1];
-            const dist = c.x - prev.x; 
-            const absDist = Math.abs(dist);
 
-            if (absDist >= prev.w * 2) { 
-                game.debris.push(createDebris(c.x, c.y, c.w, c.h, c.hue)); 
+            // 1. 실패 시 처리 (단순히 잔해를 만들고 다음 스텝으로)
+            if (c.failed) {
+                const failedX = c.targetX; 
+                game.debris.push(createDebris(failedX, c.y, c.w, c.h, c.hue)); // c.w는 움직이는 블록의 크기
                 AudioSys.playFail(); 
+                
                 game.current = null;
                 game.replayIndex++; 
                 prepareReplayStep();
                 return;
             }
 
-            let newX = prev.x, newW = prev.w, isP = false;
+            // 2. 성공/부분 성공 시 처리 (기록된 결과를 적용)
+            
+            const newX = c.targetNewX;
+            const newW = c.targetW;
+            
+            // 시각적 효과를 위한 오차 계산 (잔해 및 파티클 생성)
+            const cutW = c.w - newW; // 잘려나간 너비 (움직이는 블록 크기 - 최종 블록 크기)
+
+            // 오차 여부 확인 (잔해/퍼펙트 효과 발생 기준)
+            const dist = c.targetX - prev.x; 
+            const absDist = Math.abs(dist);
 
             if (absDist <= game_config.perfectTol) {
-                newX = prev.x; newW = prev.w; game.combo++; 
-                isP = true;
-                
-                let growth = 0;
-                if(c.isShining) { growth = game_config.baseWidth - newW; newW = game_config.baseWidth; }
-                else if(newW < game_config.baseWidth) {
-                    const potentialW = Math.min(newW + (game_config.baseWidth * game_config.recoveryRate), game_config.baseWidth);
-                    growth = potentialW - newW; newW = potentialW;
-                }
-                
-                const blockCenter = newX + prev.w / 2; const screenCenter = game.width / 2;
-                if (growth > 0) {
-                    if (Math.abs(blockCenter - screenCenter) < 1) { newX -= growth / 2; } 
-                    else if (blockCenter >= screenCenter) { newX -= growth; }
-                }
-
-                triggerPerfectEffect(newX, c.y, newW, isP);
+                game.combo++; 
+                triggerPerfectEffect(newX, c.y, newW, c.isShining);
             } else {
                 game.combo = 0; 
-                newW = prev.w - absDist;
                 
                 if (dist > 0) { 
-                    newX = prev.x; 
-                    game.debris.push(createDebris(prev.x + newW, c.y, absDist, c.h, c.hue));
+                    // 오른쪽 잘림: 잔해는 새로운 블록의 오른쪽 경계에서 시작
+                    game.debris.push(createDebris(newX + newW, c.y, cutW, c.h, c.hue));
                 } else { 
-                    newX = c.x;
-                    game.debris.push(createDebris(prev.x, c.y, absDist, c.h, c.hue));
+                    // 왼쪽 잘림: 잔해는 새로운 블록의 왼쪽 경계에서 시작 
+                    game.debris.push(createDebris(newX - cutW, c.y, cutW, c.h, c.hue));
                 }
                 createEdgeBurst(newX, c.y, newW, game_config.blockHeight, c.hue);
             }
 
+            // 블록 스택 업데이트 (기록된 정확한 결과 적용)
             game.blocks.push({ x: newX, y: c.y, w: newW, h: game_config.blockHeight, hue: c.hue });
             game.score++; ui.score.innerText = game.score; triggerScoreEffect(); 
             AudioSys.playStack(game.combo); 
             
+            // 다음 스텝 준비
             game.current = null; 
             game.replayIndex++; 
             prepareReplayStep();
             
         } else {
+            // 시간 경과에 따른 블록 이동을 부드럽게 시뮬레이션
             const prevTime = game.replayIndex > 0 ? game.replayQueue[game.replayIndex - 1].time : 0;
             const elapsed = game.replayCurrentTime - prevTime;
             const duration = c.targetTime - prevTime;
@@ -1050,6 +1087,7 @@
                 progress = 1;
             }
 
+            // 리플레이 블록 이동 처리: 시작 위치와 목표 위치 사이를 progress에 따라 이동
             const startX = c.dir===1 ? -c.w : game.width;
             c.x = startX + (c.targetX - startX) * progress;
         }
@@ -1194,7 +1232,14 @@
         initGame(true); 
     };
 
-    ui.btn.onclick = (e) => { e.stopPropagation(); startGame(); };
+    // --- 수정된 리트라이 로직: 게임 오버/데모 상태일 때만 startGame 호출 ---
+    ui.btn.onclick = (e) => { 
+        e.stopPropagation(); 
+        if (game.state === 'demo' || game.state === 'gameover') {
+            startGame(); 
+        }
+    };
+    
     ui.closeReplayBtn.onclick = (e) => { e.stopPropagation(); stopReplay(); };
     
     // Toggle Ranking Board
@@ -1215,8 +1260,18 @@
     window.addEventListener('keydown', (e) => {
         if (e.code === 'Space') {
             e.preventDefault(); 
+            
+            // 인트로 화면 -> 데모 시작
             if (!ui.intro.classList.contains('hide')) { ui.intro.click(); return; }
-            if (!ui.menu.classList.contains('hide') && !document.getElementById('initialsModal')) { startGame(); return; }
+            
+            // 메뉴(데모/게임 오버) 화면일 때만 START/RETRY 허용
+            if (game.state === 'demo' || game.state === 'gameover') {
+                 if (!ui.menu.classList.contains('hide') && !document.getElementById('initialsModal')) { 
+                    startGame(); return; 
+                 }
+            }
+            
+            // 플레이 중일 때 블록 배치
             if (game.state === 'playing') { placeBlock(); }
         }
         if (e.code === 'Escape') {
@@ -1228,7 +1283,17 @@
     const handleInput = (e) => {
         if(e.target===ui.btn || e.target===ui.closeReplayBtn || e.target===ui.rankingBtn || e.target===ui.closeRankingBtn || 
            e.target.closest('#ranking-board') || e.target.tagName==='INPUT' || e.target.id==='submitInitials' || e.target.id==='intro-screen') return;
-        if(game.state==='playing') { e.preventDefault(); placeBlock(); }
+        
+        // 메뉴 화면(데모/게임 오버)이 표시 중일 때, 버튼이 아닌 캔버스 영역 클릭은 무시
+        if (!ui.menu.classList.contains('hide')) {
+             return;
+        }
+
+        // 'playing' 상태일 때만 블록 배치 허용
+        if(game.state==='playing') { 
+            e.preventDefault(); 
+            placeBlock(); 
+        }
     };
     window.addEventListener('mousedown', handleInput);
     window.addEventListener('touchstart', handleInput, {passive:false});
