@@ -173,7 +173,7 @@
 
         #ranking-board {
             display: none; position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%); width: 85%; max-width: 400px;
+            transform: translate(-50%, -50%); width: 85%; max-width: 25rem; /* rem 단위로 변경 (약 400px -> 600px 효과 at 1.5x) */
             background: rgba(0, 0, 0, 0.9); border: 2px solid #0ff;
             border-radius: 15px; padding: 20px; box-sizing: border-box;
             z-index: 60; pointer-events: auto; text-align: center;
@@ -223,9 +223,11 @@
         #initialsModal button:disabled { border-color: #555; color: #555; cursor: not-allowed; }
 
         #close-replay-btn {
-            position: absolute; top: 20px; right: 20px; width: 40px; height: 40px;
+            position: absolute; top: 20px; right: 20px; 
+            width: 2.5rem; height: 2.5rem; /* px -> rem 변경으로 자동 스케일링 (약 40px -> 60px) */
             background: rgba(255, 0, 0, 0.2); border: 2px solid #ff0000; border-radius: 50%;
-            color: #fff; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 1.25rem; /* px -> rem 변경 */
+            font-weight: bold; display: flex; align-items: center; justify-content: center;
             cursor: pointer; z-index: 20; pointer-events: auto; transition: all 0.2s;
             animation: blink 1s infinite;
         }
@@ -643,6 +645,7 @@
         const parentH = window.innerHeight;
         let w, h;
 
+        // 2. 화면에 꽉 찰 수 있는 '시각적' 크기 계산 (Visual Size)
         if (parentW / parentH > ASPECT_RATIO) {
             h = parentH;
             w = h * ASPECT_RATIO;
@@ -653,19 +656,31 @@
 
         const MAX_WIDTH = REF_WIDTH; 
         const MAX_HEIGHT = REF_HEIGHT;
+        
+        let zoom = 1;
+
+        // 3. 시각적 크기가 MAX_WIDTH를 초과하면, 내부 해상도는 고정하고 CSS로 확대 (Visual Scaling)
         if (w > MAX_WIDTH) {
-            w = MAX_WIDTH;
-            h = MAX_HEIGHT;
+            zoom = w / MAX_WIDTH; // 확대 비율 계산
+            w = MAX_WIDTH;        // 캔버스/게임 로직 너비는 MAX로 고정
+            h = MAX_HEIGHT;       // 캔버스/게임 로직 높이도 MAX로 고정
         }
 
         wrapper.style.width = `${w}px`; 
         wrapper.style.height = `${h}px`;
+        wrapper.style.transform = `scale(${zoom})`; // CSS를 이용해 시각적으로만 확대
+        wrapper.style.transformOrigin = 'center';   // 중앙을 기준으로 확대
+
         game.width = w; 
         game.height = h; 
         canvas.width = w; 
         canvas.height = h;
 
         const scale = w / REF_WIDTH; 
+
+        // [수정됨] UI 폰트 사이즈 스케일링: 기본 16px의 1.5배인 24px를 기준값으로 설정
+        // 이 변경으로 rem 단위를 사용하는 모든 UI 요소(텍스트, 버튼 등)가 1.5배 커짐
+        document.documentElement.style.fontSize = `${24 * scale}px`;
 
         game_config.baseWidth = BASE_WIDTH * scale;
         game_config.blockHeight = BLOCK_HEIGHT * scale;
@@ -679,7 +694,7 @@
         game_config.debrisRot = DEBRIS_ROT * scale; 
         game_config.particleDecay = PARTICLE_DECAY * scale; 
 
-        // 2. 기존 객체 리사이징 (너비 비율에 맞춰 좌표/크기 보정)
+        // 4. 기존 객체 리사이징 (너비 비율에 맞춰 좌표/크기 보정)
         if (oldW > 0 && w > 0 && oldW !== w) {
             const ratio = w / oldW;
 
@@ -734,7 +749,7 @@
             if (game.stars.length === 0) initStars();
         }
     }
-    
+
     function initStars() {
         game.stars = [];
         for (let i = 0; i < game_config.starCount; i++) {
@@ -742,7 +757,8 @@
 
             game.stars.push({
                 x: Math.random() * game.width, y: Math.random() * game.height,
-                size: (Math.random() * 2 + 0.5) * (game.width / STAR_SIZE_BASE), 
+                // [수정됨] 별 크기 1.5배 확대
+                size: (Math.random() * 2 + 0.5) * (game.width / STAR_SIZE_BASE) * 1.5, 
                 speed: Math.random() * game_config.starSpeed + 0.2,
                 opacity: Math.random() * 0.5 + 0.3, twinkleSpeed: Math.random() * 0.05 + 0.01
             });
@@ -1237,7 +1253,8 @@
             
             if(p.type==='radial-wave') {
                 ctx.strokeStyle=`hsla(${p.hue},100%,80%,${p.life})`; 
-                ctx.lineWidth=3 * (game.width / REF_WIDTH); // 굵기 스케일링
+                // [수정됨] 파티클 굵기 1.5배 확대
+                ctx.lineWidth=3 * (game.width / REF_WIDTH) * 1.5; 
                 p.size += (p.max_size - p.size) * 5.0 * dt;
                 ctx.beginPath(); ctx.arc(p.x, p.y+game.cameraY, p.size, 0, Math.PI*2); ctx.stroke();
             } else {
@@ -1245,8 +1262,12 @@
                 p.y += p.vy * dt; 
                 ctx.fillStyle=p.color; ctx.globalAlpha=p.life;
                 
-                const particleSize = 3 * (game.width / REF_WIDTH); // 파티클 크기 스케일링
-                if(p.type==='burst' && p.color === '#FFEA00') { ctx.beginPath(); ctx.arc(p.x, p.y, 2 * (game.width / REF_WIDTH), 0, Math.PI*2); ctx.fill(); } 
+                // [수정됨] 파티클 크기 1.5배 확대
+                const particleSize = 3 * (game.width / REF_WIDTH) * 1.5; 
+                if(p.type==='burst' && p.color === '#FFEA00') { 
+                    // [수정됨] 버스트 파티클 크기 1.5배 확대
+                    ctx.beginPath(); ctx.arc(p.x, p.y, 2 * (game.width / REF_WIDTH) * 1.5, 0, Math.PI*2); ctx.fill(); 
+                } 
                 else { ctx.beginPath(); ctx.arc(p.x, p.y+game.cameraY, particleSize, 0, Math.PI*2); ctx.fill(); }
                 ctx.globalAlpha=1;
             }
