@@ -636,6 +636,8 @@
     }
 
     function resize() {
+        const oldW = game.width; // 1. 이전 너비 저장
+
         const ASPECT_RATIO = REF_WIDTH / REF_HEIGHT;
         const parentW = window.innerWidth;
         const parentH = window.innerHeight;
@@ -677,7 +679,60 @@
         game_config.debrisRot = DEBRIS_ROT * scale; 
         game_config.particleDecay = PARTICLE_DECAY * scale; 
 
-        initStars();
+        // 2. 기존 객체 리사이징 (너비 비율에 맞춰 좌표/크기 보정)
+        if (oldW > 0 && w > 0 && oldW !== w) {
+            const ratio = w / oldW;
+
+            // Blocks (스택)
+            game.blocks.forEach(b => {
+                b.x *= ratio;
+                b.y *= ratio;
+                b.w *= ratio;
+                b.h *= ratio;
+            });
+
+            // Current Block (현재 이동 중인 블록)
+            if (game.current) {
+                game.current.x *= ratio;
+                game.current.y *= ratio;
+                game.current.w *= ratio;
+                game.current.h *= ratio;
+                game.current.speed *= ratio; // 속도도 스케일에 맞춰 조절
+                
+                // Replay target data scaling (리플레이 중이라면 타겟도 조절)
+                if(game.current.targetX !== undefined) game.current.targetX *= ratio;
+                if(game.current.targetW !== undefined) game.current.targetW *= ratio;
+                if(game.current.targetNewX !== undefined) game.current.targetNewX *= ratio;
+            }
+
+            // Debris (잔해)
+            game.debris.forEach(d => {
+                d.x *= ratio; d.y *= ratio;
+                d.w *= ratio; d.h *= ratio;
+                d.vx *= ratio; d.vy *= ratio;
+            });
+
+            // Particles (이펙트)
+            game.particles.forEach(p => {
+                p.x *= ratio; p.y *= ratio;
+                p.vx *= ratio; p.vy *= ratio;
+                if(p.size !== undefined) p.size *= ratio;
+                if(p.max_size !== undefined) p.max_size *= ratio;
+            });
+
+            // Stars (배경 별) - 새로 생성하지 않고 위치만 조정
+            game.stars.forEach(s => {
+                s.x *= ratio; s.y *= ratio;
+                s.size *= ratio; s.speed *= ratio;
+            });
+
+            // Camera (카메라 위치)
+            game.cameraY *= ratio;
+
+        } else {
+            // 처음 로드 시에만 스타 초기화 (또는 리사이즈 로직이 안 돌았을 때)
+            if (game.stars.length === 0) initStars();
+        }
     }
     
     function initStars() {
@@ -884,7 +939,7 @@
             if (pos < w) { px = x + pos; py = y; vx = (Math.random() - 0.5) * speed; vy = -speed; } 
             else if (pos < w + h) { px = x + w; py = y + (pos - w); vx = speed; vy = (Math.random() - 0.5) * speed; } 
             else if (pos < w + h + w) { px = x + (pos - (w + h)); py = y + h; vx = (Math.random() - 0.5) * speed; vy = speed; } 
-            else { px = x; py = y + (pos - (w + h + w)); vx = -speed; vy = (Math.random() - 0.5) * speed; }
+            else { px = x; py = y + (pos - (w + h + w)); vx = -speed; vy = (Math.random() - 0.5) * speed; vy = (Math.random() - 0.5) * speed; }
             game.particles.push({ x: px, y: py, vx: vx, vy: vy, life: 1.0, color: `hsl(${hue}, 100%, 70%)` });
         }
     }
